@@ -12,20 +12,20 @@ if [ "$INSTALL_MODE" = "split" ]; then
   mapfile -t APK_FILES < split-apk/list.txt
   if [ "${#APK_FILES[@]}" -eq 0 ]; then
     echo "No APK files listed for split installation" >&2
-    exit 1
+    exit 2
   fi
   adb install-multiple "${APK_FILES[@]}"
 else
   if [ ! -f "app.apk" ]; then
     echo "app.apk not found for installation" >&2
-    exit 1
+    exit 3
   fi
 adb install app.apk
 fi
 
 if ! adb shell pm list packages | grep -Fxq "package:$PACKAGE_ID"; then
   echo "Package $PACKAGE_ID was not found in installed packages" >&2
-  exit 1
+  exit 4
 fi
 
 echo "Enabling root adb access"
@@ -36,7 +36,7 @@ adb shell setenforce 0 >/dev/null 2>&1 || true
 echo "Launching $PACKAGE_ID"
 if ! adb shell monkey -p "$PACKAGE_ID" -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1; then
   echo "Failed to launch $PACKAGE_ID via monkey" >&2
-  exit 1
+  exit 5
 fi
 
 sleep 30
@@ -44,7 +44,7 @@ sleep 30
 PID=$(adb shell pidof "$PACKAGE_ID" | tr -d '\r')
 if [ -z "$PID" ]; then
   echo "Unable to determine PID for $PACKAGE_ID" >&2
-  exit 1
+  exit 6
 fi
 
 echo "Captured process id: $PID"
@@ -56,7 +56,7 @@ adb shell cat "/proc/$PID/maps" | tr -d '\r' >"$MAPS_PATH"
 LIB_LINE=$(grep -m1 'libg.so' "$MAPS_PATH" || true)
 if [ -z "$LIB_LINE" ]; then
   echo "Could not locate libg mapping in process maps" >&2
-  exit 1
+  exit 7
 fi
 
 RANGE=$(echo "$LIB_LINE" | awk '{print $1}')
@@ -67,7 +67,7 @@ END_DEC=$((16#$END_HEX))
 SIZE=$((END_DEC - START_DEC))
 if [ "$SIZE" -le 0 ]; then
   echo "Computed invalid mapping size for libg: $SIZE" >&2
-  exit 1
+  exit 8
 fi
 
 PAGE_SIZE=4096
