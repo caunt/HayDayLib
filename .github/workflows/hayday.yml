@@ -133,10 +133,10 @@ jobs:
       - name: Launch emulator and install APK
         uses: ReactiveCircus/android-emulator-runner@v2
         with:
-          api-level: 30
-          arch: x86_64
+          api-level: 34
+          arch: arm64-v8a
           target: google_apis
-          profile: pixel_5
+          profile: pixel_7_pro
           script: PACKAGE_ID=${{ steps.prepare.outputs.package-id }} INSTALL_MODE=${{ steps.prepare.outputs.install-mode }} ./scripts/install-apk.sh
 
       - name: Upload verbose artifacts
