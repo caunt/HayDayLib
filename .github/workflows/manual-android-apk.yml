@@ -1,0 +1,53 @@
+name: Manual Android APK Install
+
+on:
+  workflow_dispatch:
+    inputs:
+      apk_url:
+        description: 'Direct download URL for the APK to install'
+        required: true
+        type: string
+
+jobs:
+  install-apk:
+    name: Start emulator and install APK
+    runs-on: ubuntu-latest
+    outputs:
+      installed-packages: ${{ steps.package-list.outputs.packages }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download APK
+        env:
+          APK_URL: ${{ inputs.apk_url }}
+        run: |
+          set -euo pipefail
+          curl -L "$APK_URL" -o app.apk
+
+      - name: Launch emulator and install APK
+        uses: ReactiveCircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          arch: x86_64
+          target: google_apis
+          profile: pixel_5
+          script: |
+            adb install app.apk
+            adb shell pm list packages > packages.txt
+
+      - name: Capture installed packages
+        id: package-list
+        run: |
+          {
+            echo "packages<<'EOF'"
+            cat packages.txt
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo '## Installed packages'
+            cat packages.txt
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Show installed packages in logs
+        run: cat packages.txt
