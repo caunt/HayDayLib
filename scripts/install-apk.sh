@@ -6,7 +6,13 @@ INSTALL_MODE="${INSTALL_MODE:-single}"
 
 ARTIFACTS_DIR="artifacts"
 SCREENSHOT_DIR="$ARTIFACTS_DIR/screenshots"
-mkdir -p "$SCREENSHOT_DIR"
+LIBG_DIR="$ARTIFACTS_DIR/libg"
+LOGS_DIR="$ARTIFACTS_DIR/logs"
+
+mkdir -p "$SCREENSHOT_DIR" "$LIBG_DIR" "$LOGS_DIR"
+
+RUN_LOG="$LOGS_DIR/run.log"
+exec > >(tee -a "$RUN_LOG") 2>&1
 
 step_index=0
 
@@ -32,8 +38,31 @@ capture_screenshot() {
   step_index=$((step_index + 1))
 }
 
+
+capture_logs() {
+  local ts prefix
+  ts=$(date -u +"%Y%m%dT%H%M%SZ")
+  prefix="$LOGS_DIR/step-$(printf '%02d' "$step_index")-$ts"
+
+  echo "Collecting failure logs to prefix: $prefix"
+
+  { uname -a || true; echo; adb devices -l || true; } >"${prefix}-host.txt" 2>&1 || true
+  adb logcat -v threadtime -d >"${prefix}-logcat.txt" 2>/dev/null || true
+  adb logcat -b crash -v threadtime -d >"${prefix}-crash.txt" 2>/dev/null || true
+  adb shell getprop >"${prefix}-getprop.txt" 2>/dev/null || true
+  adb shell dumpsys package "$PACKAGE_ID" >"${prefix}-dumpsys-package.txt" 2>/dev/null || true
+
+  if [ -n "${PID:-}" ]; then
+    adb shell cat "/proc/$PID/maps" >"${prefix}-proc-maps.txt" 2>/dev/null || true
+  fi
+
+  # Tombstones list can be useful; content may require perms.
+  adb shell ls -l /data/tombstones >"${prefix}-tombstones-ls.txt" 2>/dev/null || true
+}
+
 capture_failure_state() {
   capture_screenshot "error-state"
+  capture_logs
 }
 
 trap capture_failure_state ERR
@@ -80,7 +109,7 @@ if ! adb shell monkey -p "$PACKAGE_ID" -c android.intent.category.LAUNCHER 1 >/d
 fi
 capture_screenshot "post-launch"
 
-sleep 30
+sleep 10
 capture_screenshot "post-wait"
 
 PID=$(adb shell pidof "$PACKAGE_ID" | tr -d '\r')
@@ -92,7 +121,7 @@ fi
 echo "Captured process id: $PID"
 capture_screenshot "post-pid-capture"
 
-MAPS_PATH="$ARTIFACTS_DIR/${PACKAGE_ID}_maps.txt"
+MAPS_PATH="$LIBG_DIR/${PACKAGE_ID}_maps.txt"
 adb shell cat "/proc/$PID/maps" | tr -d '\r' >"$MAPS_PATH"
 capture_screenshot "post-maps"
 
@@ -123,7 +152,7 @@ echo "Dumping libg region (start=0x$START_HEX size=$SIZE bytes)"
 adb shell "dd if=/proc/$PID/mem of=$REMOTE_DUMP bs=$PAGE_SIZE skip=$SKIP count=$COUNT" >/dev/null
 capture_screenshot "post-remote-dump"
 
-LOCAL_DUMP="$ARTIFACTS_DIR/libg.mem"
+LOCAL_DUMP="$LIBG_DIR/libg.mem"
 adb pull "$REMOTE_DUMP" "$LOCAL_DUMP" >/dev/null
 adb shell rm -f "$REMOTE_DUMP"
 capture_screenshot "post-local-dump"
