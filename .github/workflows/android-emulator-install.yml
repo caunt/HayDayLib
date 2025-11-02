@@ -1,0 +1,52 @@
+name: Manual Android APK Install
+
+on:
+  workflow_dispatch:
+    inputs:
+      apk_url:
+        description: "Direct download URL for the APK to install"
+        required: true
+        type: string
+
+jobs:
+  install-apk:
+    name: Start emulator and install APK
+    runs-on: macos-latest
+    outputs:
+      installed_packages: ${{ steps.packages.outputs.packages }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download APK from provided URL
+        run: |
+          set -euo pipefail
+          curl -L "${{ github.event.inputs.apk_url }}" -o app.apk
+
+      - name: Boot emulator, install APK, and collect packages
+        id: emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          emulator-options: -no-window -no-snapshot -noaudio
+          script: |
+            set -euo pipefail
+            adb start-server
+            adb wait-for-device
+            adb install "${GITHUB_WORKSPACE}/app.apk"
+            adb shell pm list packages | tee "${GITHUB_WORKSPACE}/packages.txt"
+
+      - name: Publish installed packages output
+        id: packages
+        run: |
+          echo "packages<<'EOF'" >> "$GITHUB_OUTPUT"
+          cat packages.txt >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Summary
+        run: |
+          echo "Installed packages:" >> $GITHUB_STEP_SUMMARY
+          cat packages.txt >> $GITHUB_STEP_SUMMARY
