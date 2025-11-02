@@ -22,6 +22,7 @@ jobs:
 
       - name: Prepare APK
         id: prepare
+        shell: bash
         run: |
           set -euo pipefail
           SDK_DIR="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
