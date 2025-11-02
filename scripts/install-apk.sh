@@ -39,7 +39,7 @@ if ! adb shell monkey -p "$PACKAGE_ID" -c android.intent.category.LAUNCHER 1 >/d
   exit 1
 fi
 
-sleep 10
+sleep 30
 
 PID=$(adb shell pidof "$PACKAGE_ID" | tr -d '\r')
 if [ -z "$PID" ]; then
@@ -53,7 +53,7 @@ mkdir -p artifacts
 MAPS_PATH="artifacts/${PACKAGE_ID}_maps.txt"
 adb shell cat "/proc/$PID/maps" | tr -d '\r' >"$MAPS_PATH"
 
-LIB_LINE=$(grep -m1 'libg' "$MAPS_PATH" || true)
+LIB_LINE=$(grep -m1 'libg.so' "$MAPS_PATH" || true)
 if [ -z "$LIB_LINE" ]; then
   echo "Could not locate libg mapping in process maps" >&2
   exit 1
