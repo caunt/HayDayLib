@@ -46,9 +46,9 @@ jobs:
         id: package-list
         run: |
           {
-            echo "packages<<'EOF'"
+            echo 'packages<<EOF'
             cat packages.txt
-            echo 'EOF'
+            echo EOF
           } >> "$GITHUB_OUTPUT"
           {
             echo '## Installed packages'
