@@ -2,7 +2,7 @@
 
 ---
 
-## 1) High-Level Summary
+## High-Level Summary
 
 - The binary is an **ELF shared object** (`.so`) with the usual sections (`.text`, `.rodata`, `.data`, etc.).
 - It is **stripped** (no DWARF symbols observed) and relies on **embedded log strings** such as `LoginMessage::decode - ...` for ground truth of message types.
@@ -15,7 +15,7 @@
 
 ---
 
-## 2) File Format & Observations
+## File Format & Observations
 
 - **Format:** ELF shared object (`.so`). Standard section layout present.
 - **Symbols:** No public C++ symbols for message classes are exported; **no DWARF** debug info is visible. We navigate with **string anchors** and **tables**.
@@ -35,7 +35,7 @@
 
 ---
 
-## 3) Packet Registry Table (Critical)
+## Packet Registry Table (Critical)
 
 - **Region:** A dense, uniform table lives roughly in the range:
   - **`0x000ED400–0x000EE000` in file offsets** (exact boundaries may vary slightly).
@@ -57,7 +57,7 @@
 
 ---
 
-## 4) Message Type Discovery (Strings)
+## Message Type Discovery (Strings)
 
 - Message types are consistently referenced in log strings with the form:
   ```
@@ -69,7 +69,7 @@
 
 ---
 
-## 5) `LoginMessage::decode` (Packet 10100)
+## `LoginMessage::decode` (Packet 10100)
 
 - **Mapping:** **`10100 (0x2774)` → `LoginMessage`** (confirmed).
 - **Decode Flow (from log markers):** the function reads, at minimum, the following fields:
@@ -86,9 +86,28 @@
 
 ---
 
-## 6) Current Confidence
+## Development
 
-- **Registry structure & offsets:** High
-- **`10100 → LoginMessage` mapping:** Very high
-- **`LoginMessage::decode` fields:** High (from explicit log markers)
-- **Full mapping feasibility:** High
+- Commit only hunks with actual code changes. All code should use CRLF line endings and existing whitespace should be preserved; never reformat untouched lines.
+- Run `dotnet test` to ensure all tests pass whenever C# source files (`*.cs`) are modified. Skip this step if no C# files change.
+- Be patient with long-running tests and avoid aborting them early; some may take several minutes to complete.
+- After changing source code, run `dotnet build` from the repository root.
+- Conventional Commits are required for commit messages.
+- Commit messages must include a scope after the type, e.g., `docs(readme): ...`.
+- Use only the following Conventional Commit types:
+  - `feat` — Features
+  - `fix` — Bug Fixes
+  - `perf` — Performance Improvements
+  - `deps` — Dependencies
+  - `revert` — Reverts
+  - `docs` — Documentation
+  - `style` — Styles
+  - `chore` — Miscellaneous Chores
+  - `refactor` — Code Refactoring
+  - `test` — Tests
+  - `build` — Build System
+  - `ci` — Continuous Integration
+- Commit bodies are required and must include a brief note about any observable behavior change.
+- Use the `fix` or `feat` type only when your changes modify the proxy code in `./src`. For documentation, CI, or other unrelated updates, choose a more appropriate type such as `docs` or `chore`.
+- Append a [gitmoji](https://gitmoji.dev/specification) after the commit scope, e.g., `feat(api): ✨ add new endpoint`.
+- Pull request titles should follow the same Conventional Commits format.
