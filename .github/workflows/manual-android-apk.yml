@@ -11,7 +11,7 @@ on:
 jobs:
   install-apk:
     name: Start emulator and install APK
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     outputs:
       installed-packages: ${{ steps.package-list.outputs.packages }}
     steps:
