@@ -139,8 +139,8 @@ jobs:
           profile: pixel_5
           script: PACKAGE_ID=${{ steps.prepare.outputs.package-id }} INSTALL_MODE=${{ steps.prepare.outputs.install-mode }} ./scripts/install-apk.sh
 
-      - name: Upload libg dump
+      - name: Upload artifacts
+        if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
-          name: libg-dump
           path: artifacts
