@@ -20,10 +20,66 @@ else
     echo "app.apk not found for installation" >&2
     exit 1
   fi
-  adb install app.apk
+adb install app.apk
 fi
 
 if ! adb shell pm list packages | grep -Fxq "package:$PACKAGE_ID"; then
   echo "Package $PACKAGE_ID was not found in installed packages" >&2
   exit 1
 fi
+
+echo "Enabling root adb access"
+adb root >/dev/null
+adb wait-for-device
+adb shell setenforce 0 >/dev/null 2>&1 || true
+
+echo "Launching $PACKAGE_ID"
+if ! adb shell monkey -p "$PACKAGE_ID" -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1; then
+  echo "Failed to launch $PACKAGE_ID via monkey" >&2
+  exit 1
+fi
+
+sleep 10
+
+PID=$(adb shell pidof "$PACKAGE_ID" | tr -d '\r')
+if [ -z "$PID" ]; then
+  echo "Unable to determine PID for $PACKAGE_ID" >&2
+  exit 1
+fi
+
+echo "Captured process id: $PID"
+
+mkdir -p artifacts
+MAPS_PATH="artifacts/${PACKAGE_ID}_maps.txt"
+adb shell cat "/proc/$PID/maps" | tr -d '\r' >"$MAPS_PATH"
+
+LIB_LINE=$(grep -m1 'libg' "$MAPS_PATH" || true)
+if [ -z "$LIB_LINE" ]; then
+  echo "Could not locate libg mapping in process maps" >&2
+  exit 1
+fi
+
+RANGE=$(echo "$LIB_LINE" | awk '{print $1}')
+START_HEX=${RANGE%-*}
+END_HEX=${RANGE#*-}
+START_DEC=$((16#$START_HEX))
+END_DEC=$((16#$END_HEX))
+SIZE=$((END_DEC - START_DEC))
+if [ "$SIZE" -le 0 ]; then
+  echo "Computed invalid mapping size for libg: $SIZE" >&2
+  exit 1
+fi
+
+PAGE_SIZE=4096
+SKIP=$((START_DEC / PAGE_SIZE))
+COUNT=$(((SIZE + PAGE_SIZE - 1) / PAGE_SIZE))
+REMOTE_DUMP="/data/local/tmp/libg-${PID}.mem"
+
+echo "Dumping libg region (start=0x$START_HEX size=$SIZE bytes)"
+adb shell "dd if=/proc/$PID/mem of=$REMOTE_DUMP bs=$PAGE_SIZE skip=$SKIP count=$COUNT" >/dev/null
+
+LOCAL_DUMP="artifacts/libg.mem"
+adb pull "$REMOTE_DUMP" "$LOCAL_DUMP" >/dev/null
+adb shell rm -f "$REMOTE_DUMP"
+
+echo "libg memory dump saved to $LOCAL_DUMP"
