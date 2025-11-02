@@ -14,6 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       installed-packages: ${{ steps.package-list.outputs.packages }}
+      package-id: ${{ steps.verify-package.outputs.package-id }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -57,3 +58,39 @@ jobs:
 
       - name: Show installed packages in logs
         run: cat packages.txt
+
+      - name: Verify APK package ID is installed
+        id: verify-package
+        run: |
+          set -euo pipefail
+          SDK_DIR="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+          if [ -z "$SDK_DIR" ]; then
+            echo "ANDROID_SDK_ROOT or ANDROID_HOME must be set" >&2
+            exit 1
+          fi
+
+          AAPT_PATH=$(find "$SDK_DIR"/build-tools -maxdepth 2 -type f -name aapt 2>/dev/null | sort -V | tail -n1)
+          if [ -z "$AAPT_PATH" ]; then
+            echo "Unable to locate the aapt tool in the Android SDK" >&2
+            exit 1
+          fi
+
+          PACKAGE_ID=$("$AAPT_PATH" dump badging app.apk | sed -n "s/^package: name='\([^']*\)'.*/\1/p")
+          if [ -z "$PACKAGE_ID" ]; then
+            echo "Failed to extract package id from APK" >&2
+            exit 1
+          fi
+
+          if ! grep -Fxq "package:$PACKAGE_ID" packages.txt; then
+            echo "Package $PACKAGE_ID was not found in installed packages" >&2
+            exit 1
+          fi
+
+          echo "package-id=$PACKAGE_ID" >> "$GITHUB_OUTPUT"
+          {
+            echo ""
+            echo "### APK package verification"
+            echo ""
+            echo "- Extracted package id: \`$PACKAGE_ID\`"
+            echo "- Status: Found in installed packages"
+          } >> "$GITHUB_STEP_SUMMARY"
